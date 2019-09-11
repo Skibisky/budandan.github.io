@@ -64,6 +64,11 @@
         
 
 <style>
+       
+    .select2-container--bootstrap .select2-results__option[aria-selected=true] {
+        display: none;
+    }
+
     .lockedHero {
         font-weight: bold;
     }
@@ -141,7 +146,7 @@
         <div class="col-md-4 col-md-offset-1">
             <label class='control-label'>Select Heroes:</label>
             <select id="heroes-to-add" class='form-control' multiple="multiple" v-bind:disabled="isInitializing ? true : false">
-                <option v-bind:value="hero.Id" v-for="hero in heroData">{{ hero.Name }}</option>
+                <option v-bind:key="hero.Id"  v-bind:value="hero.Id" v-for="hero in leftHeros()">{{ hero.Name }}</option>
             </select>
             <p id='error-message' class='text-danger'></p>
             <label class="checkbox-inline">

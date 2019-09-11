@@ -308,6 +308,9 @@ var app = new Vue({
         toggleExperimentalFeatures: function () {
             this.isShowingExperimentalFeatures = !this.isShowingExperimentalFeatures;
         },
+        leftHeros: function() {
+            return this.heroData.filter(hero => !this.currentRoster.find(heroModel => heroModel.Id == hero.Id));
+        },
         getHeroData: function () {
             let self = this;
             $.ajax({
