@@ -1,3 +1,4 @@
+
 var showChangelog = false;
 var showInstructions = false;
 $(document).ready(function () {
@@ -42,8 +43,9 @@ function setLockErrorMessage(message) {
 var app = new Vue({
     el: '#app',
     data: function () {
+        
         return {
-            allHeroes:[],
+            allHeroes: [],
             heroData: [],
             maxNumberOfTeams: 50,
             calculatedTeams: [],
@@ -107,7 +109,7 @@ var app = new Vue({
                 validatedNumOfOthers = this.numOfOthers;
                 $.ajax({
                     type: "POST",
-                    url: "/Home/CalculateOptimalTeams",
+                    url: "http://www.epicseventools.com/Home/CalculateOptimalTeams",
                     data: {
                         "sCurrentRoster": JSON.stringify(this.currentRoster),
                         "maxNumberOfTeams": this.maxNumberOfTeams,
@@ -136,60 +138,48 @@ var app = new Vue({
             }
         },
         calculateOptimalTeamsJS: function () {
-            let arrOfPossibleTeamsContainingLockedHeroes = [];
-            let currentRosterOfSIDs = this.currentRoster.map(hero => hero.Name);
-            let arrOfPossibleTeams = this.k_combinations(currentRosterOfSIDs, this.teamSize);
-            let arrOfOutcomes = [];
-            if (this.lockedHeroes.length == 0) {
-                for (var i = 0; i < arrOfPossibleTeams.length; i++) {
-                    let result = this.determineBestChatOptionsFromTeam(arrOfPossibleTeams[i]);
-                    arrOfOutcomes.push(result);
-                }
-            } else {
-                let lockedHeroesSIDs = this.lockedHeroes.map(hero => hero.Name);
-                var j = arrOfPossibleTeams.length;
-                for (var j = 0; j < arrOfPossibleTeams.length; j++) {
-                    let containsAllHeroes = true;
-                    for (var k = 0; k < lockedHeroesSIDs.length; k++) {
-                        if (!arrOfPossibleTeams[j].includes(lockedHeroesSIDs[k])) {
-                            containsAllHeroes = false;
-                        }
-                    }
-                    if (containsAllHeroes) {
-                        arrOfPossibleTeamsContainingLockedHeroes.push(arrOfPossibleTeams[j]);
-                    }
-                }
-                arrOfPossibleTeams = arrOfPossibleTeamsContainingLockedHeroes;
-                for (var i = 0; i < arrOfPossibleTeams.length; i++) {
-                    let result = this.determineBestChatOptionsFromTeam(arrOfPossibleTeams[i]);
-                    arrOfOutcomes.push(result);
-                }
-            }
-            arrOfOutcomes.sort(this.compareScores);
-            let numOfTeamsToOutput = (this.maxNumberOfTeams < arrOfPossibleTeams.length) ? this.maxNumberOfTeams : arrOfPossibleTeams.length;
-            for (var i = 0; i < numOfTeamsToOutput; i++) {
+
+            var self = this;
+            var worker = new Worker('worker.js');
+            worker.addEventListener('message', function(e) {
+
+
+                console.log(e.data);
                 let heroArray = [];
                 let campingOptions = [];
-                for (var teamCounter = 0; teamCounter < arrOfOutcomes[i].team.length; teamCounter++) {
-                    heroArray.push(this.heroData.find(model => model.Name === arrOfOutcomes[i].team[teamCounter]));
+                for (var teamCounter = 0; teamCounter < e.data.team.length; teamCounter++) {
+                    heroArray.push(self.heroData.find(model => model.Name === e.data.team[teamCounter]));
                 }
                 campingOptions.push({
-                    "Hero": arrOfOutcomes[i].bestChatOption1.hero.name,
-                    "Option": this.uppercaseWords(arrOfOutcomes[i].bestChatOption1.option.toString().replace('-', " ")),
+                    "Hero": e.data.bestChatOption1.hero.name,
+                    "Option": self.uppercaseWords(e.data.bestChatOption1.option.toString().replace('-', " ")),
                     "Score": 0
                 });
                 campingOptions.push({
-                    "Hero": arrOfOutcomes[i].bestChatOption2.hero.name,
-                    "Option": this.uppercaseWords(arrOfOutcomes[i].bestChatOption2.option.toString().replace('-', " ")),
+                    "Hero": e.data.bestChatOption2.hero.name,
+                    "Option": self.uppercaseWords(e.data.bestChatOption2.option.toString().replace('-', " ")),
                     "Score": 0
                 });
                 let calculatedTeam = {
                     "Heroes": heroArray,
                     "CampingOptions": campingOptions,
-                    "Score": arrOfOutcomes[i].score
-                }
-                this.calculatedTeams.push(calculatedTeam);
-            }
+                    "Score": e.data.score
+                };
+                //self.calculatedTeams.sort(self.compareScores);
+                if (self.calculatedTeams.length < self.maxNumberOfTeams)
+                    self.calculatedTeams.push(calculatedTeam);
+                else
+                    worker.postMessage("stop");
+                self.calculatedTeams.sort(self.compareScores);
+                worker.postMessage(self.calculatedTeams[self.calculatedTeams.length - 1].Score);
+            });
+            setTimeout(function () {
+            worker.postMessage({
+                lockedHeroes: self.lockedHeroes,
+                currentRoster: self.currentRoster,
+                teamSize: self.teamSize,
+                allHeroes: self.allHeroes,
+            });}, 1000);
         },
         determineBestChatOptionsFromTeam: function (team) {
             let hero1 = this.allHeroes.filter(function (hero) {
@@ -314,9 +304,9 @@ var app = new Vue({
         getHeroData: function () {
             let self = this;
             $.ajax({
-                type: "POST",
-                url: "/Home/GetInitialCampingModels",
-                data: { },
+                type: "GET",
+                url: "GetInitialCampingModels.js",
+                data: {},
                 dataType: "json",
                 success: function (data) {
                     self.heroData = data;
@@ -494,7 +484,7 @@ var app = new Vue({
             };
         },
         compareScores: function (a, b) {
-            if(a.score > b.score)
+            if (a.score > b.score)
                 return -1;
             if (a.score < b.score)
                 return 1;
@@ -510,7 +500,7 @@ var app = new Vue({
             return newarray1.join(' ');
         }
     },
-    mounted: function() {
+    mounted: function () {
         this.getHeroData();
         this.checkForFourHeroes();
         if (localStorage.getItem("Heroes") != null) {
